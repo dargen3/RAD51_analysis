@@ -13,15 +13,11 @@ def distance_point_line(point, line_point, line_direction):
     distance = np.linalg.norm(perpendicular_vector)
     return distance
 
-
 def nearest_point_on_line(P0, v, Q):
     w = Q - P0
     t = np.dot(w, v) / np.dot(v, v)
     P = P0 + t * v
     return P
-
-
-
 
 def dihedral_angle_360(p1, p2, p3, p4):
     v1 = p2 - p1
@@ -132,9 +128,35 @@ for atom in structure.get_atoms():
                                                   central_line_mean,
                                                   central_line_direction_vector)))
 
+
+
 # find ideal shift
+from scipy import optimize
+from scipy.spatial.distance import cdist
+
+def objective_function(shift):
+    shifted_x = []
+    y = []
+    for i, (key, data) in enumerate(sorted(slices.items())):
+        shifted_x.extend([x[0]-i*shift[0] for x in data])
+        y.extend([x[1] for x in data])
+    points = np.array([(a,b) for a,b in zip(shifted_x, y)])
+    distances =cdist(points, points)
+    total_neares_distances = 0
+    for row in distances:
+        total_neares_distances += np.sum(np.partition(row, 100)[:100])
+    print(shift[0], total_neares_distances)
+    return total_neares_distances
 
 
+optimized_shifts = {"cif_files/8br2.cif": 0.2662628173828124,
+                    "cif_files/8bq2.cif": 0.28845153808593743}
+
+if file in optimized_shifts.keys():
+    optimized_shift = optimized_shifts[file]
+else:
+    r = optimize.minimize(objective_function, [0.3], method="Nelder-Mead")
+    optimized_shift = r.x[0]
 
 
 fig = go.Figure()
@@ -143,17 +165,23 @@ fig.update_layout(title=f"Protein in reduced dimension",
                   yaxis_title="Distance from central line")
 
 for i, (key, data) in enumerate(sorted(slices.items())):
-    fig.add_trace(go.Scatter(x=[x[0]-i*0.288 for x in data],
-                         y=[x[1] for x in data],
-                         name="Atoms",
-                         mode="markers"))
+    if i == 0:
+        showlegend = True
+    else:
+        showlegend = False
+    fig.add_trace(go.Scatter(x=[x[0]-optimized_shift*i for x in data],
+                             y=[x[1] for x in data],
+                             legendgroup = 1,
+                             name=f"{file}, shift={optimized_shift}, total_shift={optimized_shift*360}",
+                             showlegend=showlegend,
+                             mode="markers",
+                             marker=dict(size=10, color="blue")))
 fig.show()
 
 
-
-# udělat válec k kuličkama
 # optimalizovat posun a následně překrýt grafy
-
+# udělat válec k kuličkama
+# udělat objem za otočku
 
 # https://gitlab.ics.muni.cz/ceitec-cf-biodata/cf-work/-/issues/288
 
